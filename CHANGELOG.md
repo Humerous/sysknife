@@ -27,6 +27,31 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ### Fixed
 
+- **`CreateScheduledJob` namespaces its units and never overwrites an existing
+  one.** ([#520](https://github.com/lacs-project/sysknife/pull/520))
+  `packaging/sysknife-scheduled-job-edit` opened `/etc/systemd/system/<name>.service`
+  and `.timer` with `open(path, "w")`, so a job named after a unit already on the
+  system truncated it. Units are now created as `sysknife-<name>` with
+  `O_CREAT | O_EXCL`, an existing unprefixed path is refused as ambiguous rather
+  than migrated, and a timer-path collision removes the service that call had
+  already created, so a refused request leaves no half of a pair behind. The
+  `CreateScheduledJob` preview names both exact paths and says that existing
+  ones are refused, and the daemon and the helper now derive that name from one
+  function instead of two copies (closes
+  [#484](https://github.com/lacs-project/sysknife/issues/484)). Thanks to
+  [@ITSMERNB](https://github.com/ITSMERNB).
+- **The release rehearsal screen sees a publishing command behind a group, a
+  backtick or a command wrapper.**
+  ([#523](https://github.com/lacs-project/sysknife/pull/523))
+  `{ gh release create ...; }`, `` `gh release create ...` ``, and the `sudo`,
+  `nohup`, `xargs`, `time -p`, `env -i` and `command -p` wrapper forms all
+  passed a screen whose whole job is to catch them. `{` and a backtick join the
+  command-boundary class, and the wrappers compose with the shell prefixes and
+  assignments added in #513, so `nohup env -i command -p gh release create`
+  is caught as readily as the bare form. Twelve more fixtures, and the harmless
+  cases still pass (closes
+  [#522](https://github.com/lacs-project/sysknife/issues/522)). Thanks to
+  [@mikevillari](https://github.com/mikevillari).
 - **The release rehearsal screen sees a publishing command behind a shell
   prefix.** ([#513](https://github.com/lacs-project/sysknife/pull/513))
   `check-rehearsal-publication.py` matched a tool name only at the start of a
