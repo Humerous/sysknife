@@ -12,6 +12,8 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-09-28
+
 ### Added
 
 - **Broken links in the generated mdBook fail the build.**
