@@ -7,7 +7,7 @@
 <h1 align="center">SysKnife</h1>
 
 <p align="center">
-  <em>Your sysadmin co-pilot. Plan. Approve. Audit.</em>
+  <em>The Linux sysadmin MCP server. Plan. Approve. Audit.</em>
 </p>
 
 <p align="center">
@@ -28,6 +28,7 @@
 </p>
 
 <p align="center">
+  <a href="#mcp-server">MCP server</a> ·
   <a href="#install">Install</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#why-not-just-x">Why not <em>X</em>?</a> ·
@@ -70,6 +71,39 @@ or regex is filtering a language rich enough to hide intent. SysKnife removes
 the shell string entirely: the model emits
 [typed actions](docs/typed-actions.md), and a
 [public-key-verifiable audit chain](docs/the-audit-chain.md) records every one.
+
+---
+
+## MCP server
+
+SysKnife is an MCP server first. Point Claude Code, Cursor or Codex CLI at it and
+your assistant gets typed, risk-classified sysadmin tools in place of a shell:
+
+| Tool | What it does |
+|---|---|
+| `sysknife_plan` | Turns plain language into typed steps, each with a risk level, a resolved command and a daemon transaction ID |
+| `sysknife_execute` | Runs steps that carry a one-time receipt, and nothing else |
+| `sysknife_history` | Reads past runs out of the signed audit log |
+| `sysknife_doctor` | Reports daemon, provider and audit-chain health |
+| `sysknife_audit_verify` | Walks the Ed25519 chain and says whether it is intact |
+| `sysknife_get_disk_usage`, and the rest of the read-only catalogue | Direct queries, selected for the distro you are on |
+
+```sh
+npx sysknife-setup
+```
+
+One command wires the server into your client and installs the daemon.
+[Install](#install) has the detail, and [MCP protocol](#mcp-protocol) has the
+wire behaviour.
+
+**Your assistant cannot approve its own work.** `sysknife_plan` hands back a
+transaction ID and stops there. The receipt `sysknife_execute` demands comes
+from `sysknife approve <transaction-id>`, typed in your terminal, on a channel
+the model does not sit on. Missing, expired, mismatched and replayed receipts
+are all refused.
+
+Prefer to stay in the shell? [The CLI](#prefer-the-terminal-the-cli-is-a-first-class-path)
+is the same engine with no client in front of it.
 
 ---
 
