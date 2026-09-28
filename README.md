@@ -206,8 +206,9 @@ npx sysknife-setup --no-binary --daemon-mode=skip
 Whichever way you installed, there is one command for it.
 
 ```sh
-# Removes what the wizard installed: the user service, the binaries in
-# ~/.local/bin, and the MCP + agent config in the current directory.
+# Removes the user service, the binaries in ~/.local/bin, and the Claude Code
+# MCP + agent config in the current directory. A Cursor or Codex install also
+# wrote .cursor/ and ~/.codex/config.toml, and those are left in place (#526).
 npx sysknife-setup --uninstall
 
 # See exactly what that would touch, without touching it.
@@ -302,8 +303,8 @@ the other two route through.
 3. The shell shows the plan with previews, side-effects, and rollback
    metadata.
 4. You approve each step explicitly (or set `--yes` up to a risk ceiling).
-5. The daemon executes, streams live output, rolls back automatically on
-   high-risk failure.
+5. The daemon executes, streams live output, and rolls back atomic-host
+   (rpm-ostree) changes automatically on failure.
 6. Every execution is logged to a hash-chained SQLite or Postgres audit
    trail you can verify with `sysknife audit verify`.
 
@@ -326,7 +327,8 @@ mechanical: no shell strings cross the wire.
 
 SysKnife is different by construction: typed actions, an Ed25519-signed audit
 chain, explicit approval gate, automatic rollback for atomic-host (rpm-ostree)
-changes, polkit-mediated privilege boundary. The AI never holds a shell. See the
+changes, a privilege boundary scoped per action across sudo and polkit. The AI
+never holds a shell. See the
 full [SysKnife vs. alternatives](docs/comparison.md) breakdown (AIShell-Gate,
 gate-oc-audit, MCP gateways, generic mcp-shell).
 

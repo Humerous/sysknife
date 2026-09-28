@@ -63,9 +63,10 @@ pub struct Cli {
     /// Execute HIGH-risk steps with no human confirmation.
     ///
     /// Requires `SYSKNIFE_I_ACCEPT_UNATTENDED_ROOT=1` in the environment as
-    /// well; the flag on its own refuses to run. Implies `--yes`,
-    /// `--max-risk high` and `--non-interactive` unless you set a lower
-    /// `--max-risk`, which still wins.
+    /// well; the flag on its own refuses to run. It raises the ceiling that
+    /// `--yes` is clamped to and implies nothing else, so an unattended run
+    /// passes `--yes --max-risk high` explicitly. Without `--yes` nothing is
+    /// auto-approved and the run stops at the first prompt.
     ///
     /// This lifts the approval gate and nothing else. Typed actions,
     /// parameter validation, the polkit allowlist, the CLI/daemon risk-skew

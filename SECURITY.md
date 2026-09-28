@@ -146,7 +146,14 @@ part of the signed value so an auditor can tell them apart:
 
 ### Layer 4 — One-time approval receipt (sysknife-daemon)
 
-Every mutating action requires a preview→approve→execute round-trip:
+Every mutating action requires a preview→approve→execute round-trip, with one
+exception an operator has to arm deliberately: `--dangerously-skip-approval`
+lifts the human step, and refuses to run unless `SYSKNIFE_I_ACCEPT_UNATTENDED_ROOT=1`
+is set as well. A transaction previewed in that mode carries a daemon-written
+warning inside the signed `warnings_json`, so the trail records that no human
+approved. Everything below still applies to it.
+
+The round-trip itself:
 
 1. The client requests a preview; the daemon records the action + canonical
    params and returns a transaction ID.

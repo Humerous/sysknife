@@ -687,7 +687,7 @@ impl SysknifeMcpServer {
     /// Read-only and safe to call without first calling `sysknife_plan`;
     /// it never mutates system state. Mirrors `sysknife audit verify`.
     #[tool(
-        description = "Verify the tamper-evident Ed25519-signed hash chain over the audit log. Returns status (intact/broken/cannot_verify), rows_checked, and, on broken, the first offending row. Read-only and safe to call without prior sysknife_plan."
+        description = "Verify the tamper-evident Ed25519-signed hash chain over the audit log. Returns status (intact/broken/cannot_verify), rows_checked, and, on broken, the first offending row. Also returns rows_censused and attributed_rows: intact is a statement about tampering, not about how much the trail can tell you, so report those counters alongside the status rather than reading intact as complete attribution. Read-only and safe to call without prior sysknife_plan."
     )]
     async fn sysknife_audit_verify(&self) -> Result<Json<AuditVerifyReport>, ErrorData> {
         Ok(Json(audit_verify_inner().await))

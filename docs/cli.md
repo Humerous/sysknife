@@ -333,8 +333,13 @@ environment variable as well:
 
 ```sh
 SYSKNIFE_I_ACCEPT_UNATTENDED_ROOT=1 \
-  sysknife --dangerously-skip-approval --json "apply pending security updates"
+  sysknife --dangerously-skip-approval --yes --max-risk high --json \
+     "apply pending security updates"
 ```
+
+`--yes` is not optional here. The flag raises the ceiling that `--yes` is
+clamped to; it does not switch auto-approval on by itself, so without `--yes`
+the run reaches the first prompt, reads EOF on a closed stdin and exits 1.
 
 Neither half is enough alone. A flag left in a script and a variable left in a
 shell profile are the two ways this gets armed by accident, and requiring both
@@ -403,7 +408,7 @@ snapshot beforehand costs less than the alternative.
 | Code | Meaning |
 |---|---|
 | `0` | Success |
-| `1` | Plan or step **refused** — you rejected it, it exceeded the configured risk ceiling, or approval was required but the session is non-interactive |
+| `1` | Plan or step **refused** — you rejected it, it exceeded the configured risk ceiling, approval was required but the session is non-interactive, or the planner declined the request outright (distinct from a planning failure, which is `3`) |
 | `2` | **Execution failed**, a command-line usage error, or the whole-command `--timeout` expired (see below) |
 | `3` | **Planning failed** — LLM error, provider unreachable, or the intent could not be turned into a plan |
 | `4` | **Configuration or daemon error** — invalid configuration, or the daemon could not be reached |
@@ -494,7 +499,7 @@ sysknife --yes --max-risk low --non-interactive --timeout 60 \
 # Unattended, including HIGH-risk steps. Both keys are required, and every
 # step is recorded in the signed chain as having had no human approval.
 SYSKNIFE_I_ACCEPT_UNATTENDED_ROOT=1 \
-  sysknife --dangerously-skip-approval --json --timeout 300 \
+  sysknife --dangerously-skip-approval --yes --max-risk high --json --timeout 300 \
      "apply pending security updates"
 ```
 
