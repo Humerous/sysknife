@@ -14,6 +14,45 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ### Security
 
+- **Untrusted host text reaching the calling assistant over MCP is screened,
+  and the results of the read-only query tools are spotlighted.**
+  `crates/sysknife-brain/src/sanitize.rs` strips the Unicode TAG block
+  (`U+E0000..=U+E007F`), the Private Use Areas, BiDi and zero-width characters,
+  strips ANSI, normalises to NFC, rewrites forged prompt-envelope tags and caps
+  the length. Its only callers were in `planner.rs`, so the defence guarded
+  SysKnife's own model and not the operator's. Every `sysknife_<action>`
+  read-only result and the free-text fields `merge_preview_into_step` copies out
+  of the daemon's `PreviewEnvelope` reached the assistant as raw bytes, and a
+  TAG-block payload is invisible in every mainstream renderer while arriving at
+  a tokenizer byte for byte. The managed host writes a package `Description:`, a
+  unit `Description=` and a journal line, and none of the roughly seventy
+  read-only tools requires approval. Mutations still need a receipt typed at a
+  terminal the model does not sit on, and that path was already screened by
+  `operator_text::operator_safe`; the exposure was the decision in front of it,
+  because the human decides whether to type that command based on what their
+  assistant tells them the plan does. Read-only results now carry the same
+  `<untrusted_tool_output source="...">` envelope the planner uses, capped at
+  `MCP_MAX_OUTPUT_BYTES` (64 KiB, eight times the planner's cap, because the
+  assistant's context is not the one this crate is competing for and a journal
+  tail truncated at 8 KiB is a tool nobody calls twice). Every free-text field
+  of `sysknife_plan`, `sysknife_execute`, `sysknife_history`, `sysknife_doctor`
+  and `sysknife_audit_verify` is normalised before it leaves the process, keys of
+  free-form JSON subtrees included, and two keys that normalise to one string
+  are refused rather than silently collapsed. A plan step's `params`,
+  `transaction_id` and `approval_receipt` travel verbatim on purpose:
+  `compute_request_hash` hashes the action name and params, the receipt is bound
+  to that hash, and `sysknife_execute` recomputes it from what the caller sends
+  back, so normalising them would mean no approved request ever executed again.
+  Everything not on that list is screened by default. The envelope is applied
+  inside `direct_query_with_client` rather than in the router's closure, so the
+  socket-backed integration test drives the same function the router does; an
+  earlier draft put it in the closure and removing it there left every test
+  green, because the test was calling the sanitiser directly. `SECURITY.md` now
+  describes both channels and both residual risks, and its Known Limitations
+  table no longer says `query_*` results re-enter the context unsanitized or
+  cite #98, which is a merged pull request rather than a tracked issue and had
+  stood there since the initial public release.
+
 - **`SetServiceResourceLimits` refuses the units SysKnife's own enforcement and
   the host's evidence depend on, and every cgroup container.**
   The action is `RiskLevel::Medium`, which `role_for_risk_level` maps to
