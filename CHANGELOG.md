@@ -77,6 +77,15 @@ Releases before `0.2.5` predate the public launch; their notes live in the
   which would have been a grant working through one path and failing through
   the other.
 
+  **Upgrading is not crate-only.** `Fail2banBanIp` and `Fail2banUnbanIp` now
+  build `sudo /usr/lib/sysknife/fail2ban-ban …`, and both the helper and the
+  grant that authorises it live in the packaged install, so a host that takes
+  the new binary while keeping the old `/etc/sudoers.d` fragment gets "a
+  password is required" on every ban and unban. Install the package, or re-run
+  `make install`, rather than replacing the binary alone. That coupling is part
+  of why this is a middle-digit release: a call that used to succeed now refuses
+  until both sides move.
+
 - **`GrantSudoAccess` refuses a passwordless grant whose command list is `ALL`
   under another name, and the preview says so when it is.**
   `packaging/sysknife-sudoers` opens by stating that no shell or general runuser
@@ -150,6 +159,13 @@ Releases before `0.2.5` predate the public launch; their notes live in the
   table no longer says `query_*` results re-enter the context unsanitized or
   cite #98, which is a merged pull request rather than a tracked issue and had
   stood there since the initial public release.
+
+  **This changes what MCP clients receive.** A read-only query that returned a
+  bare string now returns that string inside an `<untrusted_tool_output
+  source="...">` envelope, so a client parsing the result text sees two extra
+  lines. That is a deliberate wire-shape change and the other reason this is a
+  middle-digit release. An assistant reading the result needs no change; a
+  script scraping it does.
 
 - **`SetServiceResourceLimits` refuses the units SysKnife's own enforcement and
   the host's evidence depend on, and every cgroup container.**
