@@ -13,10 +13,11 @@ use crate::actions::{
         validated_journal_priority, validated_journal_time, validated_locale, validated_log_path,
         validated_lvm_name, validated_lvm_size, validated_memory_limit, validated_mount_device,
         validated_mount_options, validated_mount_point, validated_port_or_service,
-        validated_ppa_name, validated_pro_service, validated_safe_arg, validated_sudo_commands,
-        validated_sudoers_name, validated_swap_path, validated_sysctl_key, validated_sysctl_value,
-        validated_syslog_host, validated_tasks_max, validated_timezone, validated_unit_name,
-        validated_username, validated_username_not_critical,
+        validated_ppa_name, validated_pro_service, validated_resource_limit_unit,
+        validated_safe_arg, validated_sudo_commands, validated_sudoers_name, validated_swap_path,
+        validated_sysctl_key, validated_sysctl_value, validated_syslog_host, validated_tasks_max,
+        validated_timezone, validated_unit_name, validated_username,
+        validated_username_not_critical,
     },
     ActionMechanism, ActionSpec,
 };
@@ -885,7 +886,10 @@ pub fn build_action_spec(action_name: &str, params: &Value) -> Result<ActionSpec
             Ok(services::get_service_resource_limits(&unit))
         }
         "SetServiceResourceLimits" => {
-            let unit = validated_unit_name(require_str(params, "unit")?, "unit")?;
+            // Not `validated_unit_name`: setting a property is neither an
+            // activation nor a read, and this action is Medium-risk, so a
+            // Dev-tier caller reaches it. See RESOURCE_LIMIT_PROTECTED_UNITS.
+            let unit = validated_resource_limit_unit(require_str(params, "unit")?, "unit")?;
             // Build validated PROPERTY=VALUE assignments from whichever limits
             // were supplied; at least one is required.
             let mut assignments = Vec::new();

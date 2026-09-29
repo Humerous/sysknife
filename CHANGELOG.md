@@ -12,6 +12,39 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ## [Unreleased]
 
+### Security
+
+- **`SetServiceResourceLimits` refuses the units SysKnife's own enforcement and
+  the host's evidence depend on, and every cgroup container.**
+  The action is `RiskLevel::Medium`, which `role_for_risk_level` maps to
+  `CallerRole::Dev`, and it validated its `unit` parameter by charset alone. The
+  lowest mutating tier could therefore run `systemctl set-property
+  sysknife-daemon.service TasksMax=0`, writing a persistent drop-in that stops
+  the process enforcing the Dev/Admin split and signing the audit chain. The
+  same call against `auditd` or `systemd-journald` stopped the host recording
+  what came next, against `sshd` it removed the way an operator reaches the
+  machine to undo it, and `MemoryMax=1K` on `system.slice` reached every service
+  on the box. All of them survived a reboot. `validated_activatable_unit` did
+  not cover this: its denylist is about units that hand out a root shell when
+  started, and setting a property is not a start, so that screen never ran on
+  this path. The new `validated_resource_limit_unit` refuses eleven named units
+  across four categories (SysKnife's enforcement, the host's evidence, the
+  authorization path, remote administrative access), the `systemd-journald` and
+  `auditd` families whole, and `.slice` and `.scope` targets as a class, because
+  capping a slice is a decision about every unit beneath it. Naming
+  `systemd-journald` alone would have protected the reader and left its pipes:
+  `systemd-journald-audit.socket` carries the kernel audit stream into the
+  journal and is a stock unit on every systemd host. Capping an ordinary service
+  stays a Dev-tier operation. Both unit screens now share one normaliser, which
+  lowercases, strips the type suffix and reduces an instance to its template, so
+  `sshd@1.service` no longer reduces to `sshd@1` and slips a list holding
+  `sshd`. They shared nothing before, and two hand-copied screens of this shape
+  drifted once already: the kernel-argument denylist in `executor.rs` was
+  missing `debug-shell`, so one path refused a root shell while the other
+  granted it (GHSA-f8vp-j3jh-7wjx). A name-based screen still cannot see a site-local alias;
+  masking the units you do not want touched remains the stronger control, as
+  [#144](https://github.com/lacs-project/sysknife/issues/144) says.
+
 ### Fixed
 
 - **The action reference derives its catalogue total instead of assuming one

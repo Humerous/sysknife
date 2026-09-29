@@ -193,18 +193,135 @@ pub(crate) const ROOT_SHELL_UNITS: &[&str] =
 /// risk is in bringing a unit up, not in reading or stopping it.
 pub fn validated_activatable_unit(s: &str, param: &'static str) -> Result<String, ExecutorError> {
     let unit = validated_unit_name(s, param)?;
-    // Lowercase first: systemd unit names are case-insensitive, so `.SERVICE`
-    // must strip like `.service`. Strip every unit-type suffix, not just
-    // service/target, so a `rescue.socket`-style spelling cannot slip past the
-    // denylist by wearing a different type.
+    if ROOT_SHELL_UNITS.contains(&bare_unit_name(&unit).as_str()) {
+        return Err(ExecutorError::InvalidParam(param));
+    }
+    Ok(unit)
+}
+
+/// The unit-type suffixes a name-based screen has to strip before it compares.
+///
+/// systemd unit names are case-insensitive and a unit can wear more than one
+/// type, so a screen that only knows `.service` lets `rescue.socket` through by
+/// spelling it differently.
+const UNIT_TYPE_SUFFIXES: &[&str] = &[
+    ".service", ".target", ".socket", ".mount", ".path", ".slice", ".scope",
+];
+
+/// Lowercase a unit name and strip its type suffix, so one denylist entry
+/// matches every spelling of the same unit.
+///
+/// Both unit denylists below run through this rather than each carrying its own
+/// copy of the suffix list. Two hand-copied screens of this shape drifted once
+/// already: `executor.rs` kept a second kernel-argument denylist that was
+/// missing `debug-shell`, so one path refused a root shell and the other
+/// granted it. A suffix added to one copy and not the other is that bug again
+/// in a new place.
+fn bare_unit_name(unit: &str) -> String {
     let lower = unit.to_ascii_lowercase();
-    let bare = [
-        ".service", ".target", ".socket", ".mount", ".path", ".slice", ".scope",
-    ]
-    .iter()
-    .find_map(|suffix| lower.strip_suffix(suffix))
-    .unwrap_or(&lower);
-    if ROOT_SHELL_UNITS.contains(&bare) {
+    let stripped = UNIT_TYPE_SUFFIXES
+        .iter()
+        .find_map(|suffix| lower.strip_suffix(suffix))
+        .unwrap_or(&lower);
+    // An instance carries its template name before the `@`, and systemd treats
+    // the two as one unit for every purpose a denylist cares about. Without
+    // this, `sshd@1.service` reduces to `sshd@1` and misses a list holding
+    // `sshd`, which is an instance-shaped bypass of both screens below.
+    match stripped.split_once('@') {
+        Some((template, _)) => template.to_string(),
+        None => stripped.to_string(),
+    }
+}
+
+/// Units whose resource limits a Medium-risk caller must not set.
+///
+/// `SetServiceResourceLimits` is Medium, which `role_for_risk_level` maps to
+/// `CallerRole::Dev`, and it validated its unit by charset alone. That let the
+/// lowest mutating tier run `systemctl set-property sysknife-daemon.service
+/// TasksMax=0`, which writes a persistent drop-in and stops the process that
+/// enforces the tiers and signs the audit chain. The same call against `auditd`
+/// or `systemd-journald` stops the host recording what happened next, and
+/// against `sshd` it removes the way an operator would reach the box to undo
+/// any of it.
+///
+/// `validated_activatable_unit` does not cover this. Its list is about units
+/// that hand out a root shell when started, which is a different question from
+/// "may this tier disable the security infrastructure". Setting a property is
+/// not an activation, so that screen never ran.
+///
+/// Four categories, and nothing beyond them: SysKnife's own enforcement, the
+/// host's evidence, the authorization path every privileged action crosses, and
+/// remote administrative access. Throttling NetworkManager is bad, and it is the
+/// ordinary blast radius of an action that exists to cap services; that stays a
+/// Dev decision.
+///
+/// This is a name-based screen and it inherits the limit named in issue #144: a
+/// site-local alias pointing at one of these units is spelled differently and
+/// will not match. Masking the units an operator does not want touched is still
+/// the stronger control.
+pub(crate) const RESOURCE_LIMIT_PROTECTED_UNITS: &[&str] = &[
+    // SysKnife's own enforcement and the process that signs the audit chain.
+    "sysknife-daemon",
+    // The host's record of what happened.
+    "auditd",
+    "systemd-journald",
+    "rsyslog",
+    // The authorization path every privileged action crosses.
+    "dbus",
+    "dbus-broker",
+    "polkit",
+    "polkitd",
+    "systemd-logind",
+    // The way an operator reaches the machine to undo the above. Debian ships
+    // it as `ssh.service` and Fedora as `sshd.service`; both are listed because
+    // the daemon does not know which distribution it is screening for here.
+    "ssh",
+    "sshd",
+];
+
+/// Unit-name prefixes whose whole family belongs to a protected category.
+///
+/// Naming the reader and leaving its pipes protects nothing.
+/// `systemd-journald` ships as a service and as `systemd-journald.socket`,
+/// `systemd-journald-audit.socket`, `systemd-journald-dev-log.socket` and
+/// `systemd-journald-varlink@…​.socket`; the audit socket is how the kernel's
+/// audit stream reaches the journal, and an exact-match list covering only
+/// `systemd-journald` let every one of those through. `auditd` fans out the same
+/// way through `audit-rules.service`.
+///
+/// These are prefixes rather than a longer exact list because the families grow
+/// between systemd releases, and refusing a site's own
+/// `systemd-journald-something` costs nothing next to missing the next stock
+/// socket. Everything outside these two families is matched exactly, so
+/// `sysknife-nightly-backup.service` stays cappable while `sysknife-daemon` does
+/// not.
+const RESOURCE_LIMIT_PROTECTED_PREFIXES: &[&str] = &["systemd-journald", "auditd", "audit-rules"];
+
+/// Validate a unit name whose **resource limits** an action will set.
+///
+/// Layered on [`validated_unit_name`]: same syntax rules, plus a refusal of
+/// [`RESOURCE_LIMIT_PROTECTED_UNITS`] and of every cgroup container.
+///
+/// Slices and scopes are refused as a class rather than by name. A slice holds
+/// every unit beneath it, so capping `system.slice` is a decision about the
+/// whole host and not about one service, and there is no list to keep current:
+/// the caller has to spell the suffix, because `systemctl set-property system
+/// MemoryMax=1` resolves to `system.service` rather than to the slice.
+pub fn validated_resource_limit_unit(
+    s: &str,
+    param: &'static str,
+) -> Result<String, ExecutorError> {
+    let unit = validated_unit_name(s, param)?;
+    let lower = unit.to_ascii_lowercase();
+    if lower.ends_with(".slice") || lower.ends_with(".scope") {
+        return Err(ExecutorError::InvalidParam(param));
+    }
+    let bare = bare_unit_name(&unit);
+    if RESOURCE_LIMIT_PROTECTED_UNITS.contains(&bare.as_str())
+        || RESOURCE_LIMIT_PROTECTED_PREFIXES
+            .iter()
+            .any(|family| bare.starts_with(family))
+    {
         return Err(ExecutorError::InvalidParam(param));
     }
     Ok(unit)
@@ -1172,6 +1289,90 @@ mod tests {
         // The denylist rides on top of the syntax check: garbage is still
         // rejected for the same reason `validated_unit_name` rejects it.
         assert!(validated_activatable_unit("-x.service", "unit").is_err());
+    }
+
+    #[test]
+    fn resource_limit_unit_rejects_the_enforcement_and_evidence_path() {
+        // `systemctl set-property <unit> TasksMax=0` is not an activation, so
+        // the activatable denylist never saw it, and it is Medium-risk, so a
+        // Dev-tier caller reaches it. Throttling any of these disables the
+        // machinery that would have recorded or refused what came next.
+        for protected in [
+            "sysknife-daemon.service",
+            "sysknife-daemon",
+            "SYSKNIFE-DAEMON.SERVICE",
+            "auditd.service",
+            "systemd-journald.service",
+            "systemd-journald.socket",
+            "rsyslog.service",
+            "polkit.service",
+            "dbus.service",
+            "dbus-broker.service",
+            "systemd-logind.service",
+            "sshd.service",
+            "ssh.service",
+            // Family members and instances. An exact-match list holding only
+            // `systemd-journald` let the socket carrying the kernel audit
+            // stream through, and `sshd@1.service` reduced to `sshd@1`.
+            "systemd-journald-audit.socket",
+            "systemd-journald-dev-log.socket",
+            "systemd-journald-varlink@7.socket",
+            "audit-rules.service",
+            "sshd@1.service",
+            "sysknife-daemon.socket",
+            "dbus.socket",
+        ] {
+            assert!(
+                validated_resource_limit_unit(protected, "unit").is_err(),
+                "{protected:?} resource limits must not be settable at Dev tier"
+            );
+        }
+    }
+
+    #[test]
+    fn resource_limit_unit_rejects_every_slice_and_scope() {
+        // A slice holds every unit beneath it, so capping one is a decision
+        // about the whole host rather than about one service. There is no
+        // name list to keep current here: the caller has to spell the suffix,
+        // because `systemctl set-property system MemoryMax=1` resolves to
+        // `system.service`, not to the slice.
+        for container in [
+            "system.slice",
+            "user.slice",
+            "machine.slice",
+            "user-1000.slice",
+            "init.scope",
+            "session-3.scope",
+            "SYSTEM.SLICE",
+        ] {
+            assert!(
+                validated_resource_limit_unit(container, "unit").is_err(),
+                "{container:?} is a cgroup container, not one service"
+            );
+        }
+    }
+
+    #[test]
+    fn resource_limit_unit_accepts_ordinary_services() {
+        // The common case stays at Dev tier: capping a runaway application is
+        // why this action is Medium-risk, and narrowing it further would push
+        // routine work to Admin for no gain.
+        for ok in [
+            "nginx.service",
+            "postgresql.service",
+            "my-app@1.service",
+            "podman.socket",
+            "sysknife-nightly-backup.service",
+        ] {
+            assert!(
+                validated_resource_limit_unit(ok, "unit").is_ok(),
+                "{ok:?} is an ordinary unit and must stay cappable"
+            );
+        }
+        // The denylist rides on top of the syntax check, as the activatable
+        // screen does: malformed names are still refused for the old reason.
+        assert!(validated_resource_limit_unit("-x.service", "unit").is_err());
+        assert!(validated_resource_limit_unit("", "unit").is_err());
     }
 
     #[test]
