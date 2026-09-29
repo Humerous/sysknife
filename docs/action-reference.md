@@ -279,8 +279,8 @@ Every row is derived from the live code: the command from each action's `ActionS
 | Action | Command | Risk | Distro | Rb | Ro | Description |
 |---|---|---|---|---|---|---|
 | `Fail2banStatus` | `sudo fail2ban-client status` | Low | Ubuntu | – | – | show fail2ban jail status — optional param: jail (omit for all jails); read-only |
-| `Fail2banBanIp` | `sudo fail2ban-client set sshd banip 192.0.2.1` | High | Ubuntu | – | – | ban an IP address in a fail2ban jail — params: jail\* (string), ip\* (IPv4 or IPv6); High risk |
-| `Fail2banUnbanIp` | `sudo fail2ban-client set sshd unbanip 192.0.2.1` | Medium | Ubuntu | – | – | unban an IP address from a fail2ban jail — params: jail\*, ip\*; Medium risk |
+| `Fail2banBanIp` | `sudo /usr/lib/sysknife/fail2ban-ban --op ban --jail sshd --ip 192.0.2.1` | High | Ubuntu | – | – | ban an IP address in a fail2ban jail — params: jail\* (string), ip\* (IPv4 or IPv6); High risk |
+| `Fail2banUnbanIp` | `sudo /usr/lib/sysknife/fail2ban-ban --op unban --jail sshd --ip 192.0.2.1` | Medium | Ubuntu | – | – | unban an IP address from a fail2ban jail — params: jail\*, ip\*; Medium risk |
 | `ConfigureFail2banJail` | `sudo /usr/lib/sysknife/fail2ban-jail-edit --name sshd --maxretry 3` | High | Ubuntu | – | – | write a fail2ban jail override (/etc/fail2ban/jail.d/) — params: name\*, plus at least one of enabled (bool), maxretry (1-100), bantime/findtime (seconds 0-2592000); High risk; needs fail2ban installed |
 
 ## apt

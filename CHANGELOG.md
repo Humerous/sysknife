@@ -14,6 +14,42 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ### Security
 
+- **`Fail2banBanIp` and `Fail2banUnbanIp` go through a helper with a fixed
+  argv, and the `fail2ban-client set *` grant is gone.**
+  `packaging/sysknife-sudoers` carried this, with the comment directly above the
+  grant naming the reason it was wrong:
+
+  ```
+  # `fail2ban-client set <jail> action ... actionban <cmd>` executes a command as
+  # root, and `restart`/`reload` reread config a bare grant also permitted.
+  sysknife ALL=(root) NOPASSWD: /usr/bin/fail2ban-client set *
+  ```
+
+  So four commands reached root through a grant that documented the technique:
+  `set <jail> addaction <name>`, then `set <jail> action <name> actionban
+  <command>`, then any ban to fire it. The daemon only ever built
+  `set <jail> banip <ip>` and the unban twin, so the wildcard was strictly wider
+  than anything SysKnife needed. Narrowing it to `set * banip *` does not work,
+  which is what the advisory draft for this proposed and what checking sudo's
+  own rules corrected: `*` matches across spaces and is not anchored to one
+  argument, so that pattern still admits `set sshd action p actionban '...'
+  banip 1.2.3.4`, and `certbot certonly *` is only narrow because its variable
+  part is trailing while fail2ban's jail name sits before the fixed `banip`
+  token. sudoers has no syntax to pin a middle argument.
+  `packaging/sysknife-fail2ban-ban` takes `--op ban|unban --jail <j> --ip <a>`,
+  re-validates both (`--op` is a fixed choice, the address goes through
+  `ipaddress.ip_address` so a CIDR or a range is refused, the jail regex is
+  transcribed from the daemon's `jail_is_valid`), and then runs
+  `fail2ban-client` with an argv nothing the caller supplies can reach. It
+  propagates a non-zero exit rather than reporting a ban that did not happen.
+  The helper joins the eight others this repository already uses for the same
+  reason. `tests/release/fail2ban-ban.test.sh` pins the fixed argv, proves an
+  unknown `--op` never reaches `fail2ban-client`, and carries a canary on
+  `jail_is_valid` so an edit there points at the transcribed regex; the first
+  draft of that regex refused a leading `_` or `.` that the daemon accepts,
+  which would have been a grant working through one path and failing through
+  the other.
+
 - **`GrantSudoAccess` refuses a passwordless grant whose command list is `ALL`
   under another name, and the preview says so when it is.**
   `packaging/sysknife-sudoers` opens by stating that no shell or general runuser
