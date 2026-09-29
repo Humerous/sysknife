@@ -12,6 +12,8 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-09-29
+
 ### Security
 
 - **`sysknife approve` refuses when the proposed change did not fit the view,
