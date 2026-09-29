@@ -153,6 +153,21 @@ is set as well. A transaction previewed in that mode carries a daemon-written
 warning inside the signed `warnings_json`, so the trail records that no human
 approved. Everything below still applies to it.
 
+**What the receipt proves.** It proves a human typed a command in a terminal a
+model does not sit on. That is worth less than it sounds unless the human saw
+what they agreed to, so the approval prompt renders the proposed change through
+`operator_text`, which strips the characters that reorder or hide text and bounds
+the result at 40 lines of 512 characters. The bounds are not cosmetic: an
+unbounded block scrolls the action name and risk level off the screen before the
+operator answers.
+
+For a while the prompt marked what those bounds had hidden and accepted the
+approval anyway, so a receipt could be minted on a change the operator had seen
+the first forty lines of. `sysknife approve` now refuses when anything was
+withheld, names how many lines were dropped and how many were cut short, and
+points at `--full`, which prints the change complete and puts the decision
+context after it. Nothing is unapprovable; seeing all of it costs one flag.
+
 The round-trip itself:
 
 1. The client requests a preview; the daemon records the action + canonical

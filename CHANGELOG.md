@@ -14,6 +14,33 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ### Security
 
+- **`sysknife approve` refuses when the proposed change did not fit the view,
+  and `--full` prints all of it.**
+  The prompt rendered the change through `operator_text::operator_safe_block`,
+  which drops lines past 40 and cuts lines past 512 characters, marked both, and
+  then asked for confirmation anyway. So a receipt could be minted on a change
+  the operator had seen the first forty lines of, or whose 4 KB path list had
+  been cut mid-line. The marker said something was missing. It did not say how
+  much, and nothing stopped the approval, which left the receipt proving a human
+  typed a word rather than that a human read the change. That is the one thing
+  the receipt exists to prove. `approve` now refuses, names how many lines were
+  withheld and how many were cut short, and names `--full`, which prints every
+  line and every character with the same neutralisation applied. Both counters,
+  not just the line count: one over-long line hides its tail as effectively as a
+  dropped line, and a line-count check alone passes it. `--full` prints the
+  action, risk and summary **after** the change rather than before, which is
+  what makes an uncapped render safe there: the bounds exist so a long change
+  cannot scroll the decision context off the screen, and a context printed last
+  cannot be scrolled away. Nothing becomes unapprovable; seeing all of it costs
+  one flag. `operator_safe_block` returns the counts alongside the text instead
+  of a bare `String`, so a caller printing the block holds the numbers in the
+  same value, and the refusal and the printable text now come out of one
+  function, so there is no way to print an approval view without having asked
+  whether it was complete. An earlier draft printed the block and then returned
+  the refusal, which left the print ungated: deleting the check still compiled
+  and still printed. `docs/cli.md` shows the refusal and the flag, and
+  `SECURITY.md` Layer 4 states what the receipt does and does not prove.
+
 - **`Fail2banBanIp` and `Fail2banUnbanIp` go through a helper with a fixed
   argv, and the `fail2ban-client set *` grant is gone.**
   `packaging/sysknife-sudoers` carried this, with the comment directly above the
