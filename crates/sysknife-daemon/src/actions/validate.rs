@@ -1122,6 +1122,190 @@ pub fn validated_apt_pin_expr(s: &str, param: &'static str) -> Result<String, Ex
 /// Validate a sudoers command spec: the literal `ALL`, or a comma-separated
 /// list of ABSOLUTE command paths with no wildcards, no `..`, and no shell
 /// metacharacters. Mirrors `build_rule`/`CMD_RE` in the helper.
+/// Command basenames that make a sudoers command list equivalent to `ALL`.
+///
+/// `packaging/sysknife-sudoers` opens by stating the invariant it keeps: no
+/// shell or general runuser grant is permitted. `GrantSudoAccess` enforced that
+/// against the string `"ALL"` and nothing else, while
+/// [`validated_sudo_commands`] happily accepts `/bin/bash`, which is the same
+/// capability spelled differently. `user ALL=(root) NOPASSWD: /bin/bash` is a
+/// standing passwordless root shell, and `visudo -cf` accepts it.
+///
+/// Matched on the **basename**, lowercased. The charset check in
+/// [`validated_sudo_commands`] already refuses `..` and wildcards, so
+/// `/usr/bin/../bin/bash` cannot arrive, and a basename match covers both
+/// `/bin/bash` and `/usr/bin/bash` on merged-`/usr` and split-`/usr` hosts
+/// without the daemon having to know which it is running on.
+///
+/// **What this list is, and is not.** It covers programs that hand back an
+/// interactive shell or run an arbitrary command directly. It deliberately does
+/// not try to cover every root-equivalent primitive: `cp`, `dd` and `tee` give
+/// arbitrary file write as root, which is just as severe and is a different
+/// class, and chasing it turns this into an unbounded list that refuses grants
+/// an operator has good reason to want. GTFOBins documents several hundred
+/// techniques and no name-based list will hold all of them.
+///
+/// Two things carry the rest. The refusal below only fires together with
+/// `nopasswd`, which is the same line `"ALL"` has always been held to: this
+/// repository permits granting broad authority and does not permit granting it
+/// as a standing passwordless credential. And the preview names the equivalence
+/// whenever it sees one, with or without `nopasswd`, because at Admin tier the
+/// control that matters is the human understanding what they are about to sign.
+///
+/// A copy of this list lives in `packaging/sysknife-sudoers-edit`, which is
+/// callable directly through its wildcard `NOPASSWD` grant and so needs its own
+/// screen. `tests/release/sudoers-edit.test.sh` parses this constant and fails
+/// when the two disagree, because the last time two screens of this shape were
+/// kept in step by a comment claiming parity, they drifted and one of them
+/// granted a root shell the other refused (GHSA-f8vp-j3jh-7wjx).
+pub(crate) const SHELL_EQUIVALENT_COMMANDS: &[&str] = &[
+    // Shells.
+    "sh",
+    "bash",
+    "rbash",
+    "dash",
+    "ash",
+    "zsh",
+    "ksh",
+    "ksh93",
+    "mksh",
+    "csh",
+    "tcsh",
+    "fish",
+    "busybox",
+    "pwsh",
+    "powershell",
+    // Run-as and namespace tools: they carry a command, so the grant is
+    // whatever they are asked to run.
+    "su",
+    "sudo",
+    "sudoedit",
+    "doas",
+    "runuser",
+    "pkexec",
+    "setpriv",
+    "chroot",
+    "unshare",
+    "nsenter",
+    "capsh",
+    // Interpreters. Each of these runs a program given on its command line.
+    "python",
+    "python2",
+    "python3",
+    "perl",
+    "perl5",
+    "ruby",
+    "irb",
+    "lua",
+    "luac",
+    "node",
+    "nodejs",
+    "php",
+    "tclsh",
+    "wish",
+    "expect",
+    "gdb",
+    "julia",
+    "guile",
+    "rscript",
+    "awk",
+    "gawk",
+    "mawk",
+    "nawk",
+    "sed",
+    "ed",
+    // Editors and pagers with a documented shell escape.
+    "vi",
+    "vim",
+    "vimdiff",
+    "view",
+    "ex",
+    "nvim",
+    "emacs",
+    "nano",
+    "less",
+    "more",
+    "most",
+    "man",
+    "pg",
+    "info",
+    // Utilities that exist to run another program, or that document an escape.
+    "env",
+    "nice",
+    "ionice",
+    "taskset",
+    "stdbuf",
+    "setarch",
+    "timeout",
+    "watch",
+    "flock",
+    "xargs",
+    "find",
+    "script",
+    "scriptreplay",
+    "socat",
+    "nc",
+    "ncat",
+    "netcat",
+    "tar",
+    "cpio",
+    "zip",
+    "unzip",
+    "rsync",
+    "scp",
+    "sftp",
+    "ftp",
+    "ssh",
+    "tmux",
+    "screen",
+    "byobu",
+    "make",
+    "cmake",
+    "strace",
+    "ltrace",
+    "tcpdump",
+    "docker",
+    "podman",
+    "git",
+    "crontab",
+    "at",
+    "systemctl",
+    "journalctl",
+    "apt",
+    "apt-get",
+    "dpkg",
+    "rpm",
+    "yum",
+    "dnf",
+    "zypper",
+    "pip",
+    "pip3",
+    "gem",
+    "npm",
+    "mount",
+];
+
+/// The first command in a validated sudoers list that makes it equivalent to
+/// `ALL`, or `None` when every entry is narrower than that.
+///
+/// Takes the list as [`validated_sudo_commands`] returns it, so the charset and
+/// absolute-path rules already hold. `"ALL"` answers `None`: it is not
+/// shell-*equivalent*, it is the thing itself, and its own refusal predates
+/// this one.
+pub fn shell_equivalent_sudo_command(commands: &str) -> Option<String> {
+    if commands == "ALL" {
+        return None;
+    }
+    commands
+        .split(',')
+        .filter(|c| !c.is_empty())
+        .find(|c| {
+            let base = c.rsplit('/').next().unwrap_or(c).to_ascii_lowercase();
+            SHELL_EQUIVALENT_COMMANDS.contains(&base.as_str())
+        })
+        .map(str::to_string)
+}
+
 pub fn validated_sudo_commands(s: &str, param: &'static str) -> Result<String, ExecutorError> {
     if s == "ALL" {
         return Ok(s.to_string());

@@ -5,11 +5,11 @@ use crate::actions::{
     release_upgrade, resolvectl, services, snap, ssh, sudoers, sysctl, system_info, toolbox,
     ubuntu_pro, ufw, users,
     validate::{
-        validated_activatable_unit, validated_apparmor_profile, validated_apt_package,
-        validated_apt_pin_expr, validated_apt_pin_name, validated_audit_path,
-        validated_audit_perms, validated_cpu_quota, validated_domain, validated_email,
-        validated_fstype, validated_group, validated_group_not_critical, validated_home_dir,
-        validated_hostname, validated_install_package, validated_journal_grep,
+        shell_equivalent_sudo_command, validated_activatable_unit, validated_apparmor_profile,
+        validated_apt_package, validated_apt_pin_expr, validated_apt_pin_name,
+        validated_audit_path, validated_audit_perms, validated_cpu_quota, validated_domain,
+        validated_email, validated_fstype, validated_group, validated_group_not_critical,
+        validated_home_dir, validated_hostname, validated_install_package, validated_journal_grep,
         validated_journal_priority, validated_journal_time, validated_locale, validated_log_path,
         validated_lvm_name, validated_lvm_size, validated_memory_limit, validated_mount_device,
         validated_mount_options, validated_mount_point, validated_port_or_service,
@@ -1135,7 +1135,17 @@ pub fn build_action_spec(action_name: &str, params: &Value) -> Result<ActionSpec
             // the two dimensions — scope the commands, or keep the password
             // prompt. `visudo` would happily accept the combination, so this
             // is the only place it can be refused.
-            if commands == "ALL" && nopasswd {
+            //
+            // `"ALL"` was the only spelling this refused, and
+            // `validated_sudo_commands` accepts `/bin/bash`, which is the same
+            // capability written differently: `user ALL=(root) NOPASSWD:
+            // /bin/bash` is a standing passwordless root shell and `visudo -cf`
+            // takes it without complaint. A shell-equivalent list is held to
+            // the same line as `"ALL"` now. See SHELL_EQUIVALENT_COMMANDS for
+            // what that list covers and what it deliberately leaves to the
+            // preview.
+            let shell_equivalent = shell_equivalent_sudo_command(&commands);
+            if (commands == "ALL" || shell_equivalent.is_some()) && nopasswd {
                 return Err(ExecutorError::InvalidParam("commands"));
             }
             Ok(sudoers::grant_sudo_access(

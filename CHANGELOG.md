@@ -14,6 +14,41 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ### Security
 
+- **`GrantSudoAccess` refuses a passwordless grant whose command list is `ALL`
+  under another name, and the preview says so when it is.**
+  `packaging/sysknife-sudoers` opens by stating that no shell or general runuser
+  grant is permitted. Both the daemon and `packaging/sysknife-sudoers-edit`
+  enforced that against the literal string `"ALL"`, while
+  `validated_sudo_commands` accepts any absolute path with a safe charset and no
+  wildcard, which `/bin/bash` satisfies. So
+  `GrantSudoAccess(commands="/bin/bash", nopasswd=true)` wrote
+  `<user> ALL=(root) NOPASSWD: /bin/bash`, which `visudo -cf` accepts and which
+  is a standing passwordless unrestricted root shell. `/bin/sh`,
+  `/usr/bin/python3`, `/usr/bin/perl`, `/usr/bin/env`, `/usr/bin/find` and the
+  rest of the interpreter list were equally accepted. The refusal that existed
+  was written against a string rather than against a capability.
+  `SHELL_EQUIVALENT_COMMANDS` holds 118 basenames across four groups (shells,
+  run-as and namespace tools, interpreters, and utilities whose job is running
+  another program), matched on the lowercased basename so `/bin/bash`,
+  `/usr/bin/bash` and `/BIN/BASH` are one thing. The refusal fires together with
+  `nopasswd`, which is the line `"ALL"` has always been held to: this repository
+  permits granting broad authority and does not permit granting it as a standing
+  passwordless credential. The preview names the offending command and the
+  target user whether or not `nopasswd` is set, because at High risk the control
+  is the human understanding what they are signing, and "this configures
+  privilege escalation" does not tell them that a two-entry list is a root
+  shell. The privileged helper carries the same list, because its wildcard
+  `NOPASSWD` grant makes it callable directly, skipping the preview, the receipt
+  and the signed chain; `tests/release/sudoers-edit.test.sh` parses the daemon's
+  constant, compares both directions, proves the refusal behaviourally for every
+  entry, and refuses to compare against nothing if the constant stops parsing.
+  Two hand-copied screens kept in step by a comment claiming parity is how
+  GHSA-f8vp-j3jh-7wjx happened. The catalogue's own published example was
+  `--commands /usr/bin/systemctl --nopasswd`, so the example `SECURITY.md`
+  readers and the planner's system prompt both carried was itself a root-
+  equivalent grant; both now keep the command and drop the passwordless half,
+  and `SECURITY.md` records what a basename screen cannot see.
+
 - **Untrusted host text reaching the calling assistant over MCP is screened,
   and the results of the read-only query tools are spotlighted.**
   `crates/sysknife-brain/src/sanitize.rs` strips the Unicode TAG block

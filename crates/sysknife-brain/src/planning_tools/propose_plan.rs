@@ -205,7 +205,7 @@ this is runtime status, NOT the saved configuration; on Ubuntu the saved config 
     ("GetSudoGrants",
      "list SysKnife-managed sudoers.d drop-ins — no params; read-only"),
     ("GrantSudoAccess",
-     "grant a scoped sudo rule (validated with visudo before install) — params: name* (^[a-z0-9][a-z0-9_-]*$), user*, commands* ('ALL' or comma-separated ABSOLUTE paths), runas (default root, or 'ALL'), nopasswd (bool); High risk — this configures privilege escalation"),
+     "grant a scoped sudo rule (validated with visudo before install) — params: name* (^[a-z0-9][a-z0-9_-]*$), user*, commands* ('ALL' or comma-separated ABSOLUTE paths), runas (default root, or 'ALL'), nopasswd (bool); High risk — this configures privilege escalation; nopasswd=true is REFUSED when commands is 'ALL' or names a shell, an interpreter, or any program that runs another program (bash, sh, python3, perl, awk, sed, vim, less, env, find, tar, git, systemctl, docker, ...), because such a grant is equivalent to 'ALL'"),
     ("RevokeSudoAccess",
      "remove a SysKnife-managed sudoers.d drop-in — param: name*; High risk"),
     // Log management
