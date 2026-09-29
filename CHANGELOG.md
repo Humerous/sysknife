@@ -12,6 +12,23 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ## [Unreleased]
 
+### Fixed
+
+- **The action reference derives its catalogue total instead of assuming one
+  dispatcher-internal action.**
+  ([#529](https://github.com/lacs-project/sysknife/pull/529))
+  `crates/sysknife-daemon/tests/action_reference_doc.rs` wrote the published
+  total as `total + 1` and spelled `ListJobHistory` into the sentence by hand, so
+  a second action that the dispatcher handles before the executor would have left
+  `docs/action-reference.md` claiming a number one short of the catalogue, with
+  nothing to catch it. `DISPATCHER_INTERNAL_ACTIONS` now sits beside the daemon's
+  action metadata as public API on `sysknife-daemon`, both test binaries read
+  that one list, and the footer derives the tabled count from
+  `KNOWN_ACTION_NAMES` minus it, refusing rather than wrapping if the list ever
+  outgrows the catalogue. The generated document is unchanged at one element
+  (closes [#455](https://github.com/lacs-project/sysknife/issues/455)). Thanks to
+  [@tayfuryldz](https://github.com/tayfuryldz).
+
 ## [0.23.0] — 2026-09-28
 
 ### Added
