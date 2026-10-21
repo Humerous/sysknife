@@ -12,6 +12,8 @@ Releases before `0.2.5` predate the public launch; their notes live in the
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-10-21
+
 ### Security
 
 - **The provider TLS path stops trusting distrusted emSign certificates.**
