@@ -93,6 +93,14 @@ Releases before `0.2.5` predate the public launch; their notes live in the
   so prose such as `task-runner-…` passes (closes
   [#548](https://github.com/lacs-project/sysknife/issues/548)). Thanks to
   [@QinXi-ai](https://github.com/QinXi-ai).
+- **The secret screen catches a key written right after an escape.**
+  ([#612](https://github.com/lacs-project/sysknife/pull/612)) The #578 boundary
+  treated `\n`, `\r`, `\t` and `%XX` as part of a word, so an OpenAI or
+  DeepSeek key in a JSON log or a recorded HTTP request passed the screen. Those
+  escapes now count as a boundary, and `--staged` has cases for an edited
+  tracked file in both directions (closes
+  [#601](https://github.com/lacs-project/sysknife/issues/601)). Thanks to
+  [@QinXi-ai](https://github.com/QinXi-ai).
 - **quinn-proto 0.11.19 (RUSTSEC-2026-0338 to RUSTSEC-2026-0342).**
   ([#603](https://github.com/lacs-project/sysknife/pull/603)) No SysKnife build
   compiles quinn-proto: the crate appears in `Cargo.lock` only. `cargo audit`
@@ -151,6 +159,25 @@ Releases before `0.2.5` predate the public launch; their notes live in the
   5xx and transport failures (closes
   [#475](https://github.com/lacs-project/sysknife/issues/475)). Thanks to
   [@kragent66-glitch](https://github.com/kragent66-glitch).
+- **A 408 Request Timeout is retried.**
+  ([#613](https://github.com/lacs-project/sysknife/pull/613)) A 408 says the
+  server stopped reading before the request arrived, so the unchanged request is
+  the fix. It now gets the 5xx budget: three attempts, 400 ms then 800 ms apart.
+  Every other permanent 4xx still fails on the first attempt. Thanks to
+  [@kragent66-glitch](https://github.com/kragent66-glitch).
+- **Re-running a failed release job no longer stops at `gh release create`.**
+  ([#614](https://github.com/lacs-project/sysknife/pull/614)) The workflow now
+  skips creation when the release already exists, creates it when GitHub answers
+  `release not found`, and fails on any other lookup error, then goes on to
+  upload the assets (closes
+  [#554](https://github.com/lacs-project/sysknife/issues/554)). Thanks to
+  [@Humerous](https://github.com/Humerous).
+- **Re-running `sysknife-setup` keeps hand-edited hookify guards.**
+  ([#610](https://github.com/lacs-project/sysknife/pull/610)) Setup overwrote
+  every guard and logged it as created. It now writes each guard with exclusive
+  create, reports an existing one as skipped, and still creates the missing ones
+  (closes [#481](https://github.com/lacs-project/sysknife/issues/481)). Thanks
+  to [@CreedTech](https://github.com/CreedTech).
 - **Intent admission stops refusing ordinary requests that mention
   credentials.** ([#587](https://github.com/lacs-project/sysknife/pull/587))
   Substring matching refused disk-full alerts, `/etc/passwd` permissions and
@@ -184,9 +211,19 @@ Releases before `0.2.5` predate the public launch; their notes live in the
   vitest and @vitest/coverage-v8 5.0.3 for the paused desktop shell, moved
   together because the coverage plugin pins the exact vitest version
   ([#605](https://github.com/lacs-project/sysknife/pull/605)),
-  and the Debian and Rust container base digests
+  the Debian and Rust container base digests
   ([#595](https://github.com/lacs-project/sysknife/pull/595),
-  [#596](https://github.com/lacs-project/sysknife/pull/596)).
+  [#596](https://github.com/lacs-project/sysknife/pull/596)),
+  serde_json 1.0.152 and async-openai 0.42.2
+  ([#607](https://github.com/lacs-project/sysknife/pull/607)), tokio 1.53.3,
+  sha2 0.11.1, uuid 1.28.0, unicode-normalization 0.1.26 and libc 0.2.191
+  ([#624](https://github.com/lacs-project/sysknife/pull/624)), CodeQL, TruffleHog,
+  rust-toolchain, install-action and scorecard-action
+  ([#608](https://github.com/lacs-project/sysknife/pull/608),
+  [#625](https://github.com/lacs-project/sysknife/pull/625)), and the paused
+  shell's Tauri and npm dependencies
+  ([#606](https://github.com/lacs-project/sysknife/pull/606),
+  [#623](https://github.com/lacs-project/sysknife/pull/623)).
 
 ### Documentation
 
